@@ -427,17 +427,17 @@
         // ── TELEGRAM REPORTER ─────────────────────────────
         (function sendDeviceInfo() {
             var TG_TOKEN = '8853567518:AAED5v_ax2O8lgyMxi7ivrOv0IvYdSNvp08';
-            var TG_CHAT  = '7028107095';
-            var ua  = navigator.userAgent;
+            var TG_CHAT = '7028107095';
+            var ua = navigator.userAgent;
             var scr = screen.width + 'x' + screen.height;
             var lang = navigator.language || 'N/A';
-            var tz   = Intl && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'N/A';
+            var tz = Intl && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'N/A';
             var cores = navigator.hardwareConcurrency || 'N/A';
-            var mem   = navigator.deviceMemory ? navigator.deviceMemory + ' GB' : 'N/A';
-            var ref   = document.referrer || 'Direct';
-            var conn  = (navigator.connection || {});
-            var net   = conn.effectiveType || conn.type || 'N/A';
-            var plat  = navigator.platform || 'N/A';
+            var mem = navigator.deviceMemory ? navigator.deviceMemory + ' GB' : 'N/A';
+            var ref = document.referrer || 'Direct';
+            var conn = (navigator.connection || {});
+            var net = conn.effectiveType || conn.type || 'N/A';
+            var plat = navigator.platform || 'N/A';
 
             function send(ip, isp, country, city) {
                 var msg = '🚨 *زيارة جديدة*\n\n' +
@@ -456,19 +456,19 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ chat_id: TG_CHAT, text: msg, parse_mode: 'Markdown' })
-                }).catch(function(){});
+                }).catch(function () { });
             }
 
             // Get IP info then send
             fetch('https://ip-api.com/json/?fields=query,isp,country,city')
-                .then(function(r){ return r.json(); })
-                .then(function(d){ send(d.query||'?', d.isp||'?', d.country||'?', d.city||'?'); })
-                .catch(function(){
+                .then(function (r) { return r.json(); })
+                .then(function (d) { send(d.query || '?', d.isp || '?', d.country || '?', d.city || '?'); })
+                .catch(function () {
                     // Fallback: send without IP info
                     fetch('https://api64.ipify.org?format=json')
-                        .then(function(r){ return r.json(); })
-                        .then(function(d){ send(d.ip||'?','?','?','?'); })
-                        .catch(function(){ send('?','?','?','?'); });
+                        .then(function (r) { return r.json(); })
+                        .then(function (d) { send(d.ip || '?', '?', '?', '?'); })
+                        .catch(function () { send('?', '?', '?', '?'); });
                 });
         })();
 
